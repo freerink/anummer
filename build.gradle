@@ -2,14 +2,21 @@ apply plugin: 'scala'
 apply plugin: 'eclipse'
 
 repositories {
-	mavenCentral()
+	flatDir(dirs: file('lib/akka'))
+	mavenLocal()
 }
+
+//repositories {
+//	mavenCentral name: 'central', artifactUrls: ["http://repo1.maven.org/maven2"]
+//	mavenCentral name: 'typeSafe', artifactUrls: ["http://repo.typesafe.com/typesafe/releases"]
+//}
 
 dependencies {
 	scalaTools 'org.scala-lang:scala-compiler:2.9.1'
 	scalaTools 'org.scala-lang:scala-library:2.9.1'
 
 	compile 'org.scala-lang:scala-library:2.9.1'
+	compile 'akka:akka-actor:1.2+'
 }
 
 task compute (type : JavaExec) {
