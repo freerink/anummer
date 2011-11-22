@@ -9,19 +9,19 @@ import Routing._
 
 sealed trait AnummerMessage
 case class Calculate() extends AnummerMessage
-case class Work(start: Long, end: Long) extends AnummerMessage
+case class Work(start: Long, end: Long, writeThreshold: Int) extends AnummerMessage
 case class Done(found: Long) extends AnummerMessage
 case class Result(anummers: List[Long]) extends AnummerMessage
 
 class Worker extends Actor {
 	def receive = {
-		case Work(start, end) =>
+		case Work(start, end, writeThreshold) =>
 			println("Work received start=" + start + ", end=" + end)
 			//val anummers = List(start, end)
-			self reply Done(calculateAnummers(self, start, end))
+			self reply Done(calculateAnummers(self, start, end, writeThreshold))
 	}
 
-	def calculateAnummers(me: ScalaActorRef, start: Long, end: Long): Long = {
+	def calculateAnummers(me: ScalaActorRef, start: Long, end: Long, writeThreshold: Int): Long = {
 		var a: Long = start
 		var found = 0
 		var anummers: List[Long] = List()
@@ -29,16 +29,22 @@ class Worker extends Actor {
 			val anr = new Anummer(a)
 			if (anr.isValid) {
 				found += 1
-				anummers = anummers ::: List(a)
-				if (found % 1000 == 0) {
-					//println("Found (" + found + ") A-nummers, current: " + a)
-					me reply Result(anummers)
-					anummers = List()
+				if (writeThreshold == 1) {
+					me reply Result(List(a))
+				} else {
+					anummers = anummers ::: List(a)
+					if (found % writeThreshold == 0) {
+						//println("Found (" + found + ") A-nummers, current: " + a)
+						me reply Result(anummers)
+						anummers = List()
+					}
 				}
 			}
 			a += anr.incr
 		}
-		me reply Result(anummers)
+		if (writeThreshold > 0) {
+			me reply Result(anummers)
+		}
 		found
 	}
 }
@@ -48,15 +54,18 @@ object RemoteWorkerServer {
 		remote.start("localhost", 2552)
 		remote.register("anummer-computer", actorOf[Worker])
 	}
-	
+
 	def main(args: Array[String]) = run
 }
 
-object Hoi {
+object WorkerClient {
 	def run = {
-		println(remote.address.getHostName())
+		val actor = remote.actorFor("anummer-computer", "localhost", 2552)
+		val result = (actor ? Work(1000000000L, 1010101100L, 10)).as[Result]
+		println("Result: " + result)
+		actor.exit()
 	}
-	
+
 	def main(args: Array[String]) = run
 }
 
@@ -73,6 +82,9 @@ class Master(nrOfWorkers: Int, nrOfMessages: Int, start: Long,
 
 	val writer: PrintWriter = new PrintWriter(new BufferedWriter(new FileWriter("anummers.txt")));
 
+	/**
+	 * Write the List to the PrintWriter.
+	 */
 	def write(xs: List[Long], writer: PrintWriter): List[Long] = xs match {
 		case Nil => xs
 		case x :: xs1 => {
@@ -90,7 +102,9 @@ class Master(nrOfWorkers: Int, nrOfMessages: Int, start: Long,
 
 		case Result(anummers) =>
 			totalFound += anummers.size
-			print("\rTotal found: " + totalFound)
+			if (totalFound % 10000 == 0) {
+				print("\rTotal found: " + totalFound)
+			}
 			write(anummers, writer)
 
 		case Calculate() =>
@@ -100,7 +114,7 @@ class Master(nrOfWorkers: Int, nrOfMessages: Int, start: Long,
 
 			var part = start
 			for (i <- 0 until nrOfMessages) {
-				router ! Work(part, part + incr)
+				router ! Work(part, part + incr, 1)
 				part += incr
 			}
 

@@ -2,7 +2,7 @@ apply plugin: 'scala'
 apply plugin: 'eclipse'
 
 repositories {
-	flatDir(dirs: file('lib/akka'))
+	flatDir dirs: ['lib/akka', '/home/freerink/akka-microkernel-1.2/lib/akka' ]
 	mavenLocal()
 }
 
@@ -17,9 +17,24 @@ dependencies {
 
 	compile 'org.scala-lang:scala-library:2.9.1'
 	compile 'akka:akka-actor:1.2+'
+	
+	runtime 'akka:akka-remote:1.2+'
+	runtime 'akka:protobuf-java:2.4+'
+	runtime 'akka:netty:3.2+'
+	runtime 'akka:commons-io:2.0+'
 }
 
 task compute (type : JavaExec) {
 	main = 'name.reerink.anummer.Compute'
+	classpath runtimeClasspath
+}
+
+task server (type : JavaExec) {
+	main = 'name.reerink.anummer.RemoteWorkerServer'
+	classpath runtimeClasspath
+}
+
+task client (type : JavaExec) {
+	main = 'name.reerink.anummer.WorkerClient'
 	classpath runtimeClasspath
 }
